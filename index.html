@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<title>Sofia Power Balance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a grid control room. Live 24-hour chart and readouts on top, source sliders below. Single dark look on purpose, to match the deck. */
+:root {
+  color-scheme: dark;
+  --bg: #2b2d30;
+  --panel: #34373b;
+  --line: #4a4e54;
+  --fg: #ecedef;
+  --muted: #a3a8b0;
+  --accent: #8fa3b8;
+  --good: #9cb39a;
+  --warn: #c9ad7d;
+  --bad: #b97a7a;
+  --solar: #d4c08f; --wind: #8fb3ad; --hydro: #7f97b3; --nuclear: #a59bb5; --gas: #c19f86; --coal: #6d7178; --battery: #b59aa8;
+  --display: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body {
+  font: 15px/1.5 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  background: var(--bg);
+  min-height: 100%;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: .18em; color: var(--accent); text-transform: uppercase; }
+h1 { font: 600 clamp(28px, 4.4vw, 44px)/1.05 var(--display); margin: 6px 0 4px; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+.panel { background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line); border-radius: 14px; padding: 16px; min-width: 0; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.presets button, .toggle button {
+  font: 500 13px var(--body); color: var(--fg); background: transparent; border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 14px; cursor: pointer;
+}
+.presets button:hover, .toggle button:hover { border-color: var(--accent); }
+.presets button[aria-pressed="true"], .toggle button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 18px; }
+@media (max-width: 860px) { .top { grid-template-columns: 1fr; } }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 8px; }
+.chart-head h2 { font: 600 16px var(--display); letter-spacing: .04em; margin: 0; }
+.toggles { display: flex; flex-wrap: wrap; gap: 10px; }
+.toggle { display: inline-flex; gap: 4px; }
+.toggle button { padding: 5px 11px; font-size: 12px; }
+canvas { width: 100%; height: 340px; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+
+.readouts { display: grid; gap: 10px; align-content: start; }
+.kpi { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg); }
+.kpi .label { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.kpi .value { font: 600 30px/1.1 var(--display); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.kpi .note { font-size: 12px; color: var(--muted); }
+.status { display: inline-block; font: 600 11px var(--mono); letter-spacing: .1em; padding: 3px 8px; border-radius: 999px; margin-top: 6px; }
+.ok { background: color-mix(in srgb, var(--good) 20%, transparent); color: var(--good); }
+.mid { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+.no { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
+
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 22px; }
+.slider { display: grid; gap: 4px; min-width: 0; }
+.slider .row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.slider label { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.slider label::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.slider output { font: 500 14px var(--mono); font-variant-numeric: tabular-nums; color: var(--fg); }
+.slider small { color: var(--muted); font-size: 12px; }
+input[type=range] { width: 100%; accent-color: var(--c); }
+details { color: var(--muted); font-size: 13px; }
+details summary { cursor: pointer; color: var(--fg); font-weight: 600; }
+details ul { padding-left: 18px; margin: 8px 0 0; }
+details a { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">42.70° N · 23.32° E · Bulgarian grid · 24 hours</div>
+      <h1>Sofia Power Balance</h1>
+      <p class="lede">Choose how Bulgaria makes its electricity and watch one full day play out. Every half hour, supply has to match demand. If it can't, the lights go out.</p>
+    </div>
+    <div class="presets" role="group" aria-label="Scenarios">
+      <button id="p1" data-preset="today">1 · Today (approx.)</button>
+      <button id="p2" data-preset="solar">2 · Lots of solar, no storage</button>
+      <button id="p3" data-preset="mix">3 · Solar + wind + batteries</button>
+    </div>
+  </header>
+
+  <div class="top">
+    <section class="panel" aria-label="24-hour chart">
+      <div class="chart-head">
+        <h2>Who powers each hour</h2>
+        <div class="toggles">
+          <div class="toggle" role="group" aria-label="Season">
+            <button id="s-winter" data-k="season" data-v="winter">Winter</button>
+            <button id="s-summer" data-k="season" data-v="summer">Summer</button>
+          </div>
+          <div class="toggle" role="group" aria-label="Sky">
+            <button id="sky-sun" data-k="sky" data-v="sun">Sunny</button>
+            <button id="sky-cloud" data-k="sky" data-v="cloud">Cloudy</button>
+          </div>
+          <div class="toggle" role="group" aria-label="Wind">
+            <button id="w-calm" data-k="wind" data-v="calm">Calm</button>
+            <button id="w-windy" data-k="wind" data-v="windy">Windy</button>
+          </div>
+        </div>
+      </div>
+      <canvas id="chart" role="img" aria-label="Stacked area chart of electricity supply by source over 24 hours against demand"></canvas>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <aside class="readouts" aria-live="polite">
+      <div class="kpi"><div class="label">CO₂ today</div><div class="value" id="k-co2">–</div><div class="note">tonnes, from coal and gas</div></div>
+      <div class="kpi"><div class="label">Clean share</div><div class="value" id="k-clean">–</div><div class="note">of electricity from renewables + nuclear</div></div>
+      <div class="kpi"><div class="label">Shortfall</div><div class="value" id="k-short">–</div><div class="note" id="k-short-note">hours without enough power</div><span class="status" id="k-status"></span></div>
+      <div class="kpi"><div class="label">Wasted</div><div class="value" id="k-waste">–</div><div class="note">GWh of solar or wind with nowhere to go</div></div>
+    </aside>
+  </div>
+
+  <section class="panel" aria-label="Power sources">
+    <div class="sliders" id="sliders"></div>
+  </section>
+
+  <details class="panel">
+    <summary>How the model works and where the numbers come from</summary>
+    <ul>
+      <li>This is a simplified teaching model for one day, in half-hour steps. Real grids also trade power with neighbouring countries. Here, any shortfall counts as "lights out".</li>
+      <li>Demand: winter peak about 6.6 GW, summer peak about 5 GW. These are rounded estimates of Bulgaria's daily curve. Check the real curve at <a href="https://www.eso.bg" target="_blank" rel="noopener">eso.bg</a>.</li>
+      <li>Order of use: nuclear runs flat, then solar and wind. Spare power charges batteries, and anything left over is wasted. When power runs short, the model uses batteries, then gas, then coal. Hydro comes last, for the peaks, because the dams only hold enough water for 6 hours at full power.</li>
+      <li>CO₂: lignite coal 1.1 t per MWh, gas 0.45 t per MWh. Solar, wind, hydro and nuclear count as zero while they run.</li>
+      <li>Solar output by hour uses a sunrise-to-sunset curve for Sofia's latitude. Compare it with real output in <a href="https://re.jrc.ec.europa.eu/pvg_tools/en/" target="_blank" rel="noopener">PVGIS</a>. Bulgaria's yearly mix comes from <a href="https://ourworldindata.org/energy" target="_blank" rel="noopener">Ember via Our World in Data</a>.</li>
+      <li>Batteries hold the GWh you set, can charge or discharge at a third of that per hour, and lose 10% of the energy on a round trip.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+const SRC = [
+  // key, label, unit, max, step, colour var, hint
+  ["nuclear", "Nuclear (Kozloduy)", "GW", 4, 0.1, "--nuclear", "Runs flat day and night"],
+  ["solar", "Solar", "GW", 20, 0.5, "--solar", "Only when the sun is up"],
+  ["wind", "Wind", "GW", 10, 0.1, "--wind", "Depends on the weather"],
+  ["hydro", "Hydro", "GW", 4, 0.1, "--hydro", "Flexible, but water runs out"],
+  ["battery", "Batteries", "GWh", 40, 0.5, "--battery", "Stores spare solar for the evening"],
+  ["gas", "Gas", "GW", 4, 0.1, "--gas", "Flexible, 0.45 t CO₂ per MWh"],
+  ["coal", "Lignite coal", "GW", 6, 0.1, "--coal", "Flexible, 1.1 t CO₂ per MWh"],
+];
+const PRESETS = {
+  today: { nuclear: 2.0, solar: 5.5, wind: 0.7, hydro: 2.5, battery: 1, gas: 1.0, coal: 3.5 },
+  solar: { nuclear: 2.0, solar: 15, wind: 0.7, hydro: 2.5, battery: 0, gas: 0.5, coal: 0 },
+  mix:   { nuclear: 2.0, solar: 12, wind: 5, hydro: 2.5, battery: 18, gas: 1.0, coal: 0 },
+};
+const state = { ...PRESETS.today, season: "winter", sky: "sun", wind_w: "calm", preset: "today" };
+const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
+
+// ---- model ----
+const STEPS = 48, DT = 0.5;
+const gauss = (t, c, w) => { const d = Math.min(Math.abs(t - c), 24 - Math.abs(t - c)); return Math.exp(-(d * d) / (2 * w * w)); };
+function demand(t, season) {
+  return season === "winter"
+    ? 5.2 + 0.7 * gauss(t, 9, 2.5) + 1.4 * gauss(t, 19, 2.5) - 1.2 * gauss(t, 3.5, 3)
+    : 4.2 + 0.6 * gauss(t, 14, 3) + 0.8 * gauss(t, 21, 2.2) - 1.0 * gauss(t, 4, 3);
+}
+function solarCF(t, season, sky) {
+  const [rise, set, peak] = season === "winter" ? [7.6, 17.1, 0.42] : [5.8, 20.5, 0.72];
+  if (t <= rise || t >= set) return 0;
+  return Math.pow(Math.sin(Math.PI * (t - rise) / (set - rise)), 1.3) * peak * (sky === "cloud" ? 0.3 : 1);
+}
+function windCF(t, w) { return (w === "windy" ? 0.45 : 0.08) * (1 + 0.25 * Math.cos(2 * Math.PI * (t - 3) / 24)); }
+
+function simulate(s) {
+  const rows = [];
+  let soc = s.battery * 0.5, hydroLeft = s.hydro * 6;
+  const pmax = s.battery / 3;
+  let co2 = 0, clean = 0, served = 0, waste = 0, shortH = 0;
+  for (let i = 0; i < STEPS; i++) {
+    const t = i * DT;
+    const d = demand(t, s.season);
+    const r = { t, demand: d, nuclear: s.nuclear * 0.92, solar: s.solar * solarCF(t, s.season, s.sky), wind: s.wind * windCF(t, s.wind_w), hydro: 0, battery: 0, gas: 0, coal: 0, short: 0 };
+    let gap = d - r.nuclear - r.solar - r.wind;
+    if (gap < 0) {
+      // spare power: charge batteries first, waste the rest, and trim must-run output so the stack meets demand
+      const charge = Math.min(-gap, pmax, (s.battery - soc) / (0.9 * DT));
+      soc += charge * 0.9 * DT;
+      const spill = -gap - charge;
+      waste += spill * DT;
+      // show only what serves demand: trim wind, then solar, then nuclear
+      let over = -gap;
+      for (const k of ["wind", "solar", "nuclear"]) { const cut = Math.min(over, r[k]); r[k] -= cut; over -= cut; }
+      gap = 0;
+    }
+    const use = (k, cap) => { const x = Math.max(0, Math.min(gap, cap)); r[k] += x; gap -= x; return x; };
+    soc -= use("battery", Math.min(pmax, soc / DT)) * DT;
+    use("gas", s.gas);
+    use("coal", s.coal);
+    // hydro goes last so the limited water is saved for the peaks, as dam operators do
+    hydroLeft -= use("hydro", Math.min(s.hydro, hydroLeft / DT)) * DT;
+    if (gap > 0.01) { r.short = gap; shortH += DT; }
+    co2 += (r.coal * 1100 + r.gas * 450) * DT; // GW·h × t/GWh
+    clean += (r.nuclear + r.solar + r.wind + r.hydro + r.battery) * DT;
+    served += (d - r.short) * DT;
+    rows.push(r);
+  }
+  return { rows, co2, clean: served ? clean / served : 0, shortH, waste };
+}
+
+// ---- UI ----
+const sl = document.getElementById("sliders");
+for (const [k, label, unit, max, step, c, hint] of SRC) {
+  const div = document.createElement("div");
+  div.className = "slider"; div.style.setProperty("--c", `var(${c})`);
+  div.innerHTML = `<div class="row"><label for="r-${k}">${label}</label><output id="o-${k}" for="r-${k}"></output></div>
+    <input type="range" id="r-${k}" min="0" max="${max}" step="${step}"><small>${hint}</small>`;
+  sl.appendChild(div);
+  div.querySelector("input").addEventListener("input", e => { state[k] = +e.target.value; state.preset = null; render(); });
+}
+document.getElementById("legend").innerHTML =
+  SRC.map(([k, label, , , , c]) => `<span style="--c:var(${c})">${label.replace(" (Kozloduy)", "")}</span>`).join("") +
+  `<span style="--c:var(--bad)">Shortfall</span><span style="--c:var(--fg)">Demand (line)</span>`;
+
+document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => {
+  Object.assign(state, PRESETS[b.dataset.preset]); state.preset = b.dataset.preset; render();
+}));
+document.querySelectorAll(".toggle button").forEach(b => b.addEventListener("click", () => {
+  state[b.dataset.k === "wind" ? "wind_w" : b.dataset.k] = b.dataset.v; render();
+}));
+
+const cv = document.getElementById("chart");
+function draw(res) {
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const L = 40, R = 10, T = 10, B = 26, pw = W - L - R, ph = H - T - B;
+  const ymax = 8;
+  const X = t => L + (t / 24) * pw, Y = v => T + ph - (v / ymax) * ph;
+  g.font = `11px ${css("--mono")}`; g.fillStyle = css("--muted"); g.strokeStyle = css("--line"); g.lineWidth = 1;
+  for (let v = 0; v <= ymax; v += 2) { g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke(); g.fillText(v + " GW", 2, Y(v) + 4); }
+  for (let h = 0; h <= 24; h += 3) g.fillText(String(h).padStart(2, "0") + ":00", Math.min(X(h) - 16, W - R - 34), H - 6);
+  // sunset marker shows the evening gap solar leaves
+  const set = state.season === "winter" ? 17.1 : 20.5;
+  g.setLineDash([3, 4]); g.strokeStyle = css("--solar"); g.beginPath(); g.moveTo(X(set), T); g.lineTo(X(set), T + ph); g.stroke(); g.setLineDash([]);
+  g.fillStyle = css("--solar"); g.fillText("sunset", X(set) + 4, T + 12);
+
+  const order = ["nuclear", "solar", "wind", "hydro", "battery", "gas", "coal", "short"];
+  const colour = { nuclear: "--nuclear", solar: "--solar", wind: "--wind", hydro: "--hydro", battery: "--battery", gas: "--gas", coal: "--coal", short: "--bad" };
+  const base = res.rows.map(() => 0);
+  const pts = [...res.rows, { ...res.rows[0], t: 24 }];
+  const baseP = [...base, 0];
+  for (const k of order) {
+    const top = pts.map((r, i) => baseP[i] + r[k]);
+    g.beginPath();
+    pts.forEach((r, i) => i ? g.lineTo(X(r.t), Y(top[i])) : g.moveTo(X(r.t), Y(top[i])));
+    for (let i = pts.length - 1; i >= 0; i--) g.lineTo(X(pts[i].t), Y(baseP[i]));
+    g.closePath(); g.fillStyle = css(colour[k]); g.globalAlpha = k === "short" ? 0.85 : 0.78; g.fill(); g.globalAlpha = 1;
+    top.forEach((v, i) => baseP[i] = v);
+  }
+  g.strokeStyle = css("--fg"); g.lineWidth = 2.2; g.beginPath();
+  pts.forEach((r, i) => i ? g.lineTo(X(r.t), Y(r.demand)) : g.moveTo(X(r.t), Y(r.demand)));
+  g.stroke();
+}
+
+function render() {
+  for (const [k, , unit] of SRC) {
+    document.getElementById("r-" + k).value = state[k];
+    document.getElementById("o-" + k).textContent = state[k].toFixed(1) + " " + unit;
+  }
+  document.querySelectorAll("[data-preset]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.preset === state.preset)));
+  document.querySelectorAll(".toggle button").forEach(b => b.setAttribute("aria-pressed", String(state[b.dataset.k === "wind" ? "wind_w" : b.dataset.k] === b.dataset.v)));
+  const res = simulate(state);
+  document.getElementById("k-co2").textContent = Math.round(res.co2).toLocaleString("en");
+  document.getElementById("k-clean").textContent = Math.round(res.clean * 100) + "%";
+  document.getElementById("k-short").textContent = res.shortH.toFixed(1) + " h";
+  document.getElementById("k-waste").textContent = res.waste.toFixed(1);
+  const st = document.getElementById("k-status");
+  [st.textContent, st.className] = res.shortH === 0 ? ["LIGHTS ON", "status ok"] : res.shortH <= 2 ? ["RISK OF BLACKOUTS", "status mid"] : ["BLACKOUTS", "status no"];
+  draw(res);
+}
+window.addEventListener("resize", render);
+render();
+
+// self-check: scenario 1 keeps the lights on in a sunny winter
+console.assert(simulate({ ...PRESETS.today, season: "winter", sky: "sun", wind_w: "calm" }).shortH === 0, "today preset should not black out");
+</script>
+</html>
