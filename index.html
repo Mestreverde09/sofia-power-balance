@@ -61,7 +61,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
   <section class="panel">
     <p class="step"><span>1.</span> Pick a mix</p>
     <div class="buttons">
-      <button data-preset="today">Today's mix</button>
       <button data-preset="solar">Only solar</button>
       <button data-preset="mix">Solar, wind + batteries</button>
     </div>
@@ -105,11 +104,10 @@ const SRC = [
 ];
 const FIXED = { nuclear: 2.0, hydro: 2.5 };
 const PRESETS = {
-  today: { solar: 5.5, wind: 0.7, battery: 1, gas: 1.0, coal: 3.5 },
   solar: { solar: 15, wind: 0.7, battery: 0, gas: 0.5, coal: 0 },
   mix:   { solar: 12, wind: 5, battery: 18, gas: 1.0, coal: 0 },
 };
-const state = { ...PRESETS.today, season: "winter", sky: "sun", wind_w: "calm", preset: "today" };
+const state = { ...PRESETS.solar, season: "winter", sky: "sun", wind_w: "calm", preset: "solar" };
 const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
 
 // ---- model: one day in half-hour steps ----
@@ -235,7 +233,6 @@ render();
 
 // self-check: same results as the deck for a calm, sunny winter day
 const day = p => simulate({ ...PRESETS[p], ...FIXED, season: "winter", sky: "sun", wind_w: "calm" });
-console.assert(day("today").shortH === 0 && Math.round(day("today").co2 / 1000) === 61, "today: 61,000 t, no blackout");
 console.assert(day("solar").shortH === 11.5 && day("mix").shortH === 6.5, "blackout hours match the deck");
 </script>
 </html>
