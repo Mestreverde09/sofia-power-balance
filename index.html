@@ -50,6 +50,14 @@ canvas { width: 100%; height: 320px; display: block; }
 .slider output { font-variant-numeric: tabular-nums; color: var(--muted); }
 input[type=range] { width: 100%; accent-color: var(--accent); }
 .fixed { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+.tip { position: relative; cursor: help; border-bottom: 1px dotted var(--muted); }
+.tip:hover::after, .tip:focus::after {
+  content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 5;
+  width: max-content; max-width: 260px; padding: 8px 10px; border-radius: 8px;
+  background: var(--fg); color: #fff; font-size: 14px; font-weight: 400; line-height: 1.4;
+  box-shadow: 0 4px 14px rgba(31, 51, 71, .2);
+}
+.legend .tip { border-bottom: none; }
 </style>
 
 <div class="wrap">
@@ -96,11 +104,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 <script>
 // key, label, unit, max, step
 const SRC = [
-  ["solar", "Solar", "GW", 20, 0.5],
-  ["wind", "Wind", "GW", 10, 0.5],
-  ["battery", "Batteries", "GWh", 40, 1],
-  ["coal", "Coal", "GW", 6, 0.5],
-  ["gas", "Gas", "GW", 4, 0.5],
+  ["solar", "Panels turn sunlight into electricity. They make nothing at night.", "Solar", "GW", 20, 0.5],
+  ["wind", "Turbines spin when the wind blows. On a calm day they make very little.", "Wind", "GW", 10, 0.5],
+  ["battery", "They store spare solar from midday and give it back in the evening.", "Batteries", "GWh", 40, 1],
+  ["coal", "Lignite plants can run any time, but they make the most CO₂.", "Coal", "GW", 6, 0.5],
+  ["gas", "Gas plants start fast when power runs short. Less CO₂ than coal.", "Gas", "GW", 4, 0.5],
 ];
 const FIXED = { nuclear: 2.0, hydro: 2.5 };
 const PRESETS = {
@@ -156,22 +164,22 @@ function simulate(s) {
 
 // ---- page ----
 const GROUPS = [ // what the chart shows, bottom to top
-  ["Nuclear + hydro", "--steady", r => r.nuclear + r.hydro],
-  ["Solar", "--solar", r => r.solar],
-  ["Wind", "--wind", r => r.wind],
-  ["Batteries", "--battery", r => r.battery],
-  ["Coal + gas", "--fossil", r => r.coal + r.gas],
-  ["No power", "--short", r => r.short],
+  ["Nuclear + hydro", "--steady", "Nuclear runs day and night. Hydro uses water from dams for the busiest hours.", r => r.nuclear + r.hydro],
+  ["Solar", "--solar", "Panels turn sunlight into electricity. They make nothing at night.", r => r.solar],
+  ["Wind", "--wind", "Turbines spin when the wind blows. On a calm day they make very little.", r => r.wind],
+  ["Batteries", "--battery", "Spare solar stored at midday and used in the evening.", r => r.battery],
+  ["Coal + gas", "--fossil", "Coal and gas plants fill the gaps, but they release CO₂.", r => r.coal + r.gas],
+  ["No power", "--short", "Times when there is less power than people need, so the lights go out.", r => r.short],
 ];
 document.getElementById("legend").innerHTML =
-  GROUPS.map(([l, c]) => `<span style="--c:var(${c})">${l}</span>`).join("") +
-  `<span class="line" style="--c:var(--fg)">What people use</span>`;
+  GROUPS.map(([l, c, t]) => `<span class="tip" tabindex="0" data-tip="${t}" style="--c:var(${c})">${l}</span>`).join("") +
+  `<span class="line tip" tabindex="0" data-tip="How much electricity Bulgaria needs at each moment of the day." style="--c:var(--fg)">What people use</span>`;
 
 const sl = document.getElementById("sliders");
-for (const [k, label, unit, max, step] of SRC) {
+for (const [k, tip, label, unit, max, step] of SRC) {
   const div = document.createElement("div");
   div.className = "slider";
-  div.innerHTML = `<div class="row"><label for="r-${k}">${label}</label><output id="o-${k}"></output></div>
+  div.innerHTML = `<div class="row"><label for="r-${k}" class="tip" tabindex="0" data-tip="${tip}">${label}</label><output id="o-${k}"></output></div>
     <input type="range" id="r-${k}" min="0" max="${max}" step="${step}">`;
   sl.appendChild(div);
   div.querySelector("input").addEventListener("input", e => { state[k] = +e.target.value; state.preset = null; render(); });
@@ -201,7 +209,7 @@ function draw(res) {
 
   const pts = [...res.rows, { ...res.rows[0], t: 24 }];
   const base = pts.map(() => 0);
-  for (const [, c, f] of GROUPS) {
+  for (const [, c, , f] of GROUPS) {
     const top = pts.map((r, i) => base[i] + f(r));
     g.beginPath();
     pts.forEach((r, i) => i ? g.lineTo(X(r.t), Y(top[i])) : g.moveTo(X(r.t), Y(top[i])));
@@ -215,7 +223,7 @@ function draw(res) {
 }
 
 function render() {
-  for (const [k, , unit] of SRC) {
+  for (const [k, , , unit] of SRC) {
     document.getElementById("r-" + k).value = state[k];
     document.getElementById("o-" + k).textContent = state[k] + " " + unit;
   }
